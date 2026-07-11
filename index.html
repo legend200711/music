@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Dodge Dash Legends</title>
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#7c4dff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+<meta name="apple-mobile-web-app-title" content="Dodge Dash">
+<meta name="description" content="3D Arcade Racing — dodge traffic, collect power-ups, race to the finish!">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:#0a0a0f;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;}
@@ -120,6 +129,12 @@ canvas{display:block;}
     <button onclick="showScreen('screen-stats')" class="menu-btn" style="background:linear-gradient(135deg,#1565c0,#00e5ff);">🏆 STATS</button>
   </div>
   <div id="save-badge" style="margin-top:28px;font-size:12px;color:#555;letter-spacing:1px;"></div>
+
+  <!-- Install to phone button — shown only when browser fires beforeinstallprompt -->
+  <button id="btn-install" onclick="installApp()" style="display:none;margin-top:16px;background:linear-gradient(135deg,#00897b,#00e5ff);border:none;border-radius:12px;color:#fff;padding:12px 28px;font-size:13px;font-weight:800;letter-spacing:1.5px;cursor:pointer;width:260px;touch-action:manipulation;">
+    📲 INSTALL ON PHONE
+  </button>
+  <div id="install-hint" style="display:none;margin-top:10px;font-size:11px;color:#555;text-align:center;max-width:260px;line-height:1.6;letter-spacing:0.5px;"></div>
 </div>
 
 <!-- Race Mode / Track Select -->
@@ -2517,6 +2532,156 @@ function boot() {
 }
 
 boot();
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  PWA — Service Worker registration + Install prompt
+// ═══════════════════════════════════════════════════════════
+
+// Register service worker (enables offline play + "Add to Home Screen")
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+// Android / Chrome: capture the install prompt
+let _installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _installPrompt = e;
+
+  const btn  = document.getElementById('btn-install');
+  const hint = document.getElementById('install-hint');
+  if (btn) btn.style.display = 'block';
+  if (hint) {
+    hint.style.display = 'block';
+    hint.textContent   = 'Tap to add Dodge Dash Legends to your home screen. Play offline, full screen!';
+  }
+});
+
+// Called when the install button is tapped
+window.installApp = async function() {
+  if (_installPrompt) {
+    // Android / Chrome — native prompt
+    _installPrompt.prompt();
+    const { outcome } = await _installPrompt.userChoice;
+    _installPrompt = null;
+    const btn  = document.getElementById('btn-install');
+    const hint = document.getElementById('install-hint');
+    if (outcome === 'accepted') {
+      if (btn)  btn.style.display  = 'none';
+      if (hint) hint.textContent   = '✅ Installed! Open from your home screen.';
+    }
+  } else {
+    // iOS Safari — no automatic prompt, show manual instructions
+    showInstallInstructions();
+  }
+};
+
+function showInstallInstructions() {
+  // Detect platform
+  const isIOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+
+  // Build modal overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(0,0,0,0.88);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;box-sizing:border-box;
+    backdrop-filter:blur(6px);
+  `;
+
+  let steps = '';
+  if (isIOS) {
+    steps = `
+      <div style="display:flex;align-items:center;gap:12px;margin:10px 0;">
+        <span style="font-size:26px;">1️⃣</span>
+        <span>Tap the <strong style="color:#00e5ff;">Share</strong> button <strong style="font-size:18px;">⬆</strong> at the bottom of Safari</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin:10px 0;">
+        <span style="font-size:26px;">2️⃣</span>
+        <span>Scroll down and tap <strong style="color:#00e5ff;">"Add to Home Screen"</strong></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin:10px 0;">
+        <span style="font-size:26px;">3️⃣</span>
+        <span>Tap <strong style="color:#00e676;">Add</strong> in the top right corner</span>
+      </div>
+      <div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.06);border-radius:8px;font-size:12px;color:#888;">
+        ⚠️ Must be opened in <strong style="color:#fff">Safari</strong> (not Chrome) on iPhone/iPad
+      </div>
+    `;
+  } else if (isAndroid) {
+    steps = `
+      <div style="display:flex;align-items:center;gap:12px;margin:10px 0;">
+        <span style="font-size:26px;">1️⃣</span>
+        <span>Tap the <strong style="color:#00e5ff;">⋮ menu</strong> (3 dots) in Chrome</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin:10px 0;">
+        <span style="font-size:26px;">2️⃣</span>
+        <span>Tap <strong style="color:#00e5ff;">"Add to Home screen"</strong></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin:10px 0;">
+        <span style="font-size:26px;">3️⃣</span>
+        <span>Tap <strong style="color:#00e676;">Add</strong></span>
+      </div>
+    `;
+  } else {
+    steps = `
+      <div style="display:flex;align-items:center;gap:12px;margin:10px 0;">
+        <span style="font-size:26px;">📱</span>
+        <span>Open this page on your phone in <strong style="color:#00e5ff;">Chrome (Android)</strong> or <strong style="color:#00e5ff;">Safari (iPhone)</strong> to install.</span>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#888;">Then use the browser menu → "Add to Home Screen"</div>
+    `;
+  }
+
+  overlay.innerHTML = `
+    <div style="background:#0d0d1a;border:1px solid rgba(0,229,255,0.3);border-radius:20px;padding:28px;max-width:380px;width:100%;color:#fff;font-size:14px;line-height:1.6;">
+      <div style="text-align:center;margin-bottom:18px;">
+        <div style="font-size:48px;">📲</div>
+        <h2 style="margin:8px 0 4px;font-size:20px;font-weight:900;letter-spacing:1px;background:linear-gradient(135deg,#00e5ff,#7c4dff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Install Dodge Dash Legends</h2>
+        <p style="color:#666;font-size:12px;margin:0;">Add to your home screen for full screen play</p>
+      </div>
+      ${steps}
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:20px;padding:12px;background:linear-gradient(135deg,#7c4dff,#e040fb);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:1px;">
+        GOT IT ✓
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// Show install button on iOS too (Safari won't fire beforeinstallprompt)
+window.addEventListener('load', () => {
+  const isIOS        = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                    || window.navigator.standalone === true;
+
+  if (isIOS && !isStandalone) {
+    const btn  = document.getElementById('btn-install');
+    const hint = document.getElementById('install-hint');
+    if (btn) btn.style.display = 'block';
+    if (hint) {
+      hint.style.display = 'block';
+      hint.textContent   = 'Open in Safari then use Share → Add to Home Screen';
+    }
+  }
+
+  // If already installed as PWA, hide the button entirely
+  if (isStandalone) {
+    const btn  = document.getElementById('btn-install');
+    const hint = document.getElementById('install-hint');
+    if (btn)  btn.style.display  = 'none';
+    if (hint) hint.style.display = 'none';
+  }
+});
 </script>
 </body>
 </html>
